@@ -142,4 +142,27 @@ class TextPackTest {
         assertEquals(1, readAssets.size());
         assertEquals("test2.file", readAssets.iterator().next().getFileName());
     }
+
+    @Test
+    void convertToTextBundleDir(@TempDir Path tempDir) throws IOException {
+        // Given
+        Path path = tempDir.resolve("my.textpack");
+        try (TextPack file = new TextPack(path)) {
+            file.writeContent(new TextContent(ContentType.MARKDOWN, "Sample MD"));
+            file.writeAsset(new Asset("test1.raw", "raw-content".getBytes(StandardCharsets.UTF_8)));
+            file.writeAsset(new Asset("test2.raw", "raw-content2".getBytes(StandardCharsets.UTF_8)));
+        }
+
+        // When
+        Path unpacked = tempDir.resolve("unpackedDir");
+        try (TextPack file = new TextPack(path)) {
+            file.unpackTo(tempDir.resolve(unpacked));
+        }
+
+        // Then
+        assertTrue(Files.exists(unpacked.resolve("text.markdown")));
+        assertTrue(Files.exists(unpacked.resolve("assets/test1.raw")));
+        assertTrue(Files.exists(unpacked.resolve("assets/test1.raw")));
+        assertTrue(Files.exists(unpacked.resolve("info.json")));
+    }
 }

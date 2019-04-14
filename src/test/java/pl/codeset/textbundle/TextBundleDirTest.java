@@ -145,4 +145,23 @@ class TextBundleDirTest {
         assertEquals(1, readAssets.size());
         assertEquals("test2.file", readAssets.iterator().next().getFileName());
     }
+
+    @Test
+    void shouldConvertToTextPack(@TempDir Path tempDir) throws IOException {
+        // Given
+        Path path = tempDir.resolve("my.bundle");
+        try (TextBundleDir dir = new TextBundleDir(path)) {
+            dir.writeContent(new TextContent(ContentType.MARKDOWN, "Sample MD"));
+            dir.writeAsset(new Asset("test1.raw", "raw-content".getBytes(StandardCharsets.UTF_8)));
+            dir.writeAsset(new Asset("test2.raw", "raw-content2".getBytes(StandardCharsets.UTF_8)));
+        }
+
+        // When
+        Path textPack = tempDir.resolve("sample.textpack");
+        try (TextBundleDir dir = new TextBundleDir(path)) {
+            dir.packTo(textPack);
+        }
+
+        assertTrue(Files.exists(textPack));
+    }
 }

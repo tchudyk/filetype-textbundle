@@ -136,10 +136,10 @@ public class TextBundleDir implements TextBundle {
         Map<String, String> env = new HashMap<>();
         env.put("create", "true");
         URI uri = URI.create("jar:file:" + targetPath.toString());
+        Files.deleteIfExists(targetPath);
         if (targetPath.getParent() != null) {
             Files.createDirectories(targetPath.getParent());
         }
-        Files.deleteIfExists(targetPath);
         try (FileSystem fileSystem = FileSystems.newFileSystem(uri, env)) {
             Path zipRoot = fileSystem.getPath("/");
             Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
