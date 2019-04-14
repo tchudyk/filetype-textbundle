@@ -30,7 +30,7 @@ public class TextPack implements TextBundle {
         filePath = path;
         Map<String, String> env = new HashMap<>();
         env.put("create", "true");
-        URI uri = URI.create("jar:file:" + path.toString());
+        URI uri = URI.create("jar:" + path.toUri().toString());
         if (path.getParent() != null) {
             Files.createDirectories(path.getParent());
         }

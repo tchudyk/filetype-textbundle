@@ -135,7 +135,7 @@ public class TextBundleDir implements TextBundle {
     public void packTo(Path targetPath) throws IOException {
         Map<String, String> env = new HashMap<>();
         env.put("create", "true");
-        URI uri = URI.create("jar:file:" + targetPath.toString());
+        URI uri = URI.create("jar:" + targetPath.toUri().toString());
         Files.deleteIfExists(targetPath);
         if (targetPath.getParent() != null) {
             Files.createDirectories(targetPath.getParent());
