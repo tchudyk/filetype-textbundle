@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 public class TextBundleDir implements TextBundle {
@@ -133,6 +134,16 @@ public class TextBundleDir implements TextBundle {
     }
 
     public void packTo(Path targetPath) throws IOException {
+        String fileName = path.getFileName().toString();
+        int dotIndex = fileName.lastIndexOf(".");
+        if (dotIndex > 0) {
+            packTo(targetPath, fileName.substring(0, dotIndex) + ".textbundle");
+        } else {
+            packTo(targetPath, UUID.randomUUID() + ".textbundle");
+        }
+    }
+
+    public void packTo(Path targetPath, String textBundleName) throws IOException {
         Map<String, String> env = new HashMap<>();
         env.put("create", "true");
         URI uri = URI.create("jar:" + targetPath.toUri().toString());
@@ -141,7 +152,8 @@ public class TextBundleDir implements TextBundle {
             Files.createDirectories(targetPath.getParent());
         }
         try (FileSystem fileSystem = FileSystems.newFileSystem(uri, env)) {
-            Path zipRoot = fileSystem.getPath("/");
+            Path zipRoot = fileSystem.getPath(textBundleName);
+            Files.createDirectories(zipRoot);
             Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {

@@ -128,8 +128,10 @@ class TextPackTest {
 
         // When
         try (TextPack file = new TextPack(path)) {
-            Asset asset = file.readAssets().stream().filter(a -> a.getFileName().equals("test1.file"))
-                    .findFirst().orElseThrow(RuntimeException::new);
+            Asset asset = file.readAssets().stream()
+                    .filter(a -> a.getFileName().equals("test1.file"))
+                    .findFirst()
+                    .orElseThrow(RuntimeException::new);
             file.removeAsset(asset);
         }
 

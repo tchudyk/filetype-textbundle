@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -25,6 +26,7 @@ public class TextPack implements TextBundle {
 
     private final Path filePath;
     private final FileSystem fileSystem;
+    private Path innerPath;
 
     public TextPack(Path path) throws IOException {
         filePath = path;
@@ -37,10 +39,43 @@ public class TextPack implements TextBundle {
         fileSystem = FileSystems.newFileSystem(uri, env);
     }
 
+    private Path getInnerPath() {
+        if (innerPath == null) {
+            try (Stream<Path> files = Files.list(fileSystem.getPath("/"))) {
+                Set<String> paths = files
+                        .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".textbundle") || p.getFileName().toString().toLowerCase().equals("info.json"))
+                        .map(path -> path.getFileName().toString())
+                        .collect(Collectors.toSet());
+                for (String path : paths) {
+                    if (path.toLowerCase().equals("info.json")) {
+                        innerPath = fileSystem.getPath("/");
+                        break;
+                    } else if (path.toLowerCase().endsWith(".textbundle")) {
+                        innerPath = fileSystem.getPath("/").resolve(path);
+                        break;
+                    }
+                }
+                if (innerPath == null) {
+                    String fileName = filePath.getFileName().toString();
+                    int dotIndex = fileName.lastIndexOf(".");
+                    if (dotIndex > 0) {
+                        innerPath = fileSystem.getPath("/").resolve(fileName.substring(0, dotIndex) + ".textbundle");
+                    } else {
+                        innerPath = fileSystem.getPath("/").resolve(UUID.randomUUID() + ".textbundle");
+                    }
+                    Files.createDirectories(innerPath);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return innerPath;
+    }
+
     @Override
     public MetaData readMetaData() throws IOException {
         try {
-            byte[] bytes = Files.readAllBytes(fileSystem.getPath("info.json"));
+            byte[] bytes = Files.readAllBytes(getInnerPath().resolve("info.json"));
             return new Gson().fromJson(new String(bytes, StandardCharsets.UTF_8), MetaData.class);
         } catch (NoSuchFileException e) {
             return new MetaData();
@@ -50,14 +85,14 @@ public class TextPack implements TextBundle {
     @Override
     public TextPack writeMetaData(MetaData metaData) throws IOException {
         String json = new Gson().toJson(metaData);
-        Files.write(fileSystem.getPath("info.json"), json.getBytes(StandardCharsets.UTF_8));
+        Files.write(getInnerPath().resolve("info.json"), json.getBytes(StandardCharsets.UTF_8));
         return this;
     }
 
     @Override
     public Set<Asset> readAssets() throws IOException {
         Set<Asset> assets = new HashSet<>();
-        Path assetsPath = fileSystem.getPath("assets");
+        Path assetsPath = getInnerPath().resolve("assets");
         if (!Files.exists(assetsPath)) {
             return assets;
         }
@@ -65,7 +100,7 @@ public class TextPack implements TextBundle {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 if (attrs.isRegularFile()) {
-                    assets.add(new Asset(fileSystem.getPath("/"), file));
+                    assets.add(new Asset(getInnerPath(), file));
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -75,7 +110,7 @@ public class TextPack implements TextBundle {
 
     @Override
     public TextPack writeAsset(Asset asset) throws IOException {
-        Path path = fileSystem.getPath(asset.getPath());
+        Path path = getInnerPath().resolve(asset.getPath());
         if (path.getParent() != null) {
             Files.createDirectories(path.getParent());
         }
@@ -87,23 +122,23 @@ public class TextPack implements TextBundle {
 
     @Override
     public TextPack removeAsset(Asset asset) throws IOException {
-        Files.deleteIfExists(fileSystem.getPath("/").resolve(asset.getPath()));
+        Files.deleteIfExists(getInnerPath().resolve(asset.getPath()));
         return this;
     }
 
     @Override
     public TextContent readContent() throws IOException {
-        try (Stream<Path> paths = Files.walk(fileSystem.getPath("/"))) {
+        try (Stream<Path> paths = Files.walk(getInnerPath())) {
             Path contentPath = paths
                     .filter(Files::isRegularFile)
                     .filter(f -> f.getFileName().toString().toLowerCase().startsWith("text."))
                     .findFirst()
-                    .orElse(fileSystem.getPath("text." + ContentType.MARKDOWN.getExtension()));
+                    .orElse(getInnerPath().resolve("text." + ContentType.MARKDOWN.getExtension()));
 
             ContentType contentType = ContentType.findByPath(contentPath)
                     .orElseThrow(() -> new IOException("Unsupported content type " + contentPath.getFileName()));
 
-            return new TextContent(fileSystem.getPath("/"), contentPath.getFileName().toString(), contentType);
+            return new TextContent(getInnerPath(), contentPath.getFileName().toString(), contentType);
         }
     }
 
@@ -111,12 +146,12 @@ public class TextPack implements TextBundle {
     public TextPack writeContent(TextContent textContent) throws IOException {
         updateMetaData();
 
-        Files.write(fileSystem.getPath("text." + textContent.getContentType().getExtension()), textContent.getContent());
+        Files.write(getInnerPath().resolve("text." + textContent.getContentType().getExtension()), textContent.getContent());
         return this;
     }
 
     private void updateMetaData() throws IOException {
-        if (!Files.exists(fileSystem.getPath("info.json"))) {
+        if (!Files.exists(getInnerPath().resolve("info.json"))) {
             writeMetaData(new MetaData());
         }
     }
@@ -146,7 +181,7 @@ public class TextPack implements TextBundle {
         if (!Files.exists(path)) {
             Files.createDirectories(path);
         }
-        Path zipRoot = fileSystem.getPath("/");
+        Path zipRoot = getInnerPath();
         Files.walkFileTree(zipRoot, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
